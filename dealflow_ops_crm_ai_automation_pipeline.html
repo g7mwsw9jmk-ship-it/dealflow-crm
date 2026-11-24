@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DealFlow Ops — CRM &amp; AI Automation Pipeline</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen antialiased">
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold text-sm">DF</div>
+        <div>
+          <h1 class="text-base sm:text-lg font-bold text-slate-900 leading-tight">DealFlow Ops</h1>
+          <p class="text-xs text-slate-500">B2B Sales Pipeline &amp; Automation Rules</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <div class="bg-slate-100 p-1 rounded-xl flex gap-1">
+          <button type="button" data-tab="board" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-slate-900 shadow-xs cursor-pointer">Pipeline</button>
+          <button type="button" data-tab="analytics" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 cursor-pointer">Analytics</button>
+          <button type="button" data-tab="rules" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 cursor-pointer">Automations</button>
+        </div>
+        <button id="newDealBtn" type="button" class="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold cursor-pointer transition shadow-xs">
+          + New Deal
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+    <!-- Top Metrics -->
+    <section class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+        <div class="text-xs text-slate-500">Total Pipeline</div>
+        <div id="metricTotal" class="text-xl sm:text-2xl font-bold text-slate-900 mt-1">$0</div>
+      </div>
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+        <div class="text-xs text-slate-500">Weighted Forecast</div>
+        <div id="metricWeighted" class="text-xl sm:text-2xl font-bold text-blue-600 mt-1">$0</div>
+      </div>
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+        <div class="text-xs text-slate-500">Closed Won</div>
+        <div id="metricWon" class="text-xl sm:text-2xl font-bold text-emerald-600 mt-1">$0</div>
+      </div>
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+        <div class="text-xs text-slate-500">Active Automations</div>
+        <div id="metricRules" class="text-xl sm:text-2xl font-bold text-slate-900 mt-1">3 / 4</div>
+      </div>
+    </section>
+
+    <!-- Board View -->
+    <section id="boardView" class="space-y-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex flex-wrap items-center gap-2">
+          <input id="dealSearch" type="text" placeholder="Filter deals by company or owner..." class="w-full sm:w-64 border border-slate-200 rounded-xl px-3.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          <select id="priorityFilter" class="border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="ALL">All Priorities</option>
+            <option value="High">High Priority</option>
+            <option value="Medium">Medium Priority</option>
+            <option value="Low">Low Priority</option>
+          </select>
+        </div>
+        <div class="text-xs text-slate-500">Click stage arrows on any card to move deals through the pipeline</div>
+      </div>
+
+      <div id="kanbanGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start"></div>
+    </section>
+
+    <!-- Analytics View -->
+    <section id="analyticsView" class="hidden grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs">
+        <h2 class="text-sm font-bold text-slate-900 mb-1">Pipeline Value by Stage</h2>
+        <p class="text-xs text-slate-500 mb-4">Distribution of deal value across sales stages</p>
+        <div class="relative h-72">
+          <canvas id="stageChart"></canvas>
+        </div>
+      </div>
+      <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs">
+        <h2 class="text-sm font-bold text-slate-900 mb-1">Pipeline by Account Owner</h2>
+        <p class="text-xs text-slate-500 mb-4">Total active deal value assigned per owner</p>
+        <div class="relative h-72">
+          <canvas id="ownerChart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Automations View -->
+    <section id="rulesView" class="hidden space-y-4">
+      <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+          <div>
+            <h2 class="text-base font-bold text-slate-900">Workflow Automation Triggers</h2>
+            <p class="text-xs text-slate-500">Toggle active rules and simulate live webhook events</p>
+          </div>
+          <button id="simulateTriggerBtn" type="button" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer transition">
+            Simulate Incoming Lead
+          </button>
+        </div>
+        <div id="rulesList" class="space-y-3"></div>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs">
+        <h3 class="text-sm font-bold text-slate-900 mb-3">Execution Log</h3>
+        <div id="execLog" class="space-y-2 text-xs font-mono text-slate-600 max-h-48 overflow-y-auto"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- New Deal Modal -->
+  <div id="dealModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-base font-bold text-slate-900">Create New Deal</h3>
+        <button id="closeDealModal" type="button" class="text-slate-400 hover:text-slate-600 text-xl leading-none cursor-pointer">&times;</button>
+      </div>
+      <form id="dealForm" class="space-y-3">
+        <div>
+          <label class="block text-xs font-medium text-slate-700 mb-1">Company Name</label>
+          <input id="dealCompany" type="text" required placeholder="Acme Robotics" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-slate-700 mb-1">Value ($)</label>
+            <input id="dealValue" type="number" required min="100" value="4500" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-700 mb-1">Owner</label>
+            <input id="dealOwner" type="text" required value="Alex M." class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-700 mb-1">Priority</label>
+          <select id="dealPriority" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="High">High</option>
+            <option value="Medium" selected>Medium</option>
+            <option value="Low">Low</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-700 mb-1">Initial Stage</label>
+          <select id="dealStage" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="lead">New Lead (20%)</option>
+            <option value="qualified">Qualified (50%)</option>
+            <option value="proposal">Proposal Sent (75%)</option>
+            <option value="won">Closed Won (100%)</option>
+          </select>
+        </div>
+        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl text-sm transition cursor-pointer">
+          Add to Pipeline
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Deal Detail Modal -->
+  <div id="detailModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 id="detailTitle" class="text-base font-bold text-slate-900">Deal Details</h3>
+        <button id="closeDetailModal" type="button" class="text-slate-400 hover:text-slate-600 text-xl leading-none cursor-pointer">&times;</button>
+      </div>
+      <div id="detailMeta" class="text-xs text-slate-500"></div>
+      <div>
+        <label class="block text-xs font-medium text-slate-700 mb-1">Internal Notes</label>
+        <textarea id="detailNotes" rows="3" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Add call notes or next steps..."></textarea>
+      </div>
+      <div class="flex items-center justify-between gap-2 pt-1">
+        <button id="deleteDealBtn" type="button" class="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold cursor-pointer">Delete Deal</button>
+        <button id="saveDetailBtn" type="button" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold cursor-pointer">Save Notes</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const STAGES = [
+      { id: 'lead', title: 'New Lead', prob: 0.20, badge: 'bg-slate-100 text-slate-700' },
+      { id: 'qualified', title: 'Qualified', prob: 0.50, badge: 'bg-blue-50 text-blue-700' },
+      { id: 'proposal', title: 'Proposal Sent', prob: 0.75, badge: 'bg-amber-50 text-amber-700' },
+      { id: 'won', title: 'Closed Won', prob: 1.00, badge: 'bg-emerald-50 text-emerald-700' }
+    ];
+
+    let deals = [
+      { id: 1, company: 'Vertex Logistics', value: 8500, owner: 'Sarah K.', stage: 'proposal', tag: 'n8n + CRM', priority: 'High', notes: 'Waiting for final API scope sign-off.' },
+      { id: 2, company: 'MedCore Clinic', value: 4200, owner: 'Alex M.', stage: 'qualified', tag: 'AI Support', priority: 'Medium', notes: 'Demo scheduled for Thursday.' },
+      { id: 3, company: 'BrightHomes Realty', value: 3100, owner: 'Alex M.', stage: 'lead', tag: 'Calculator', priority: 'Low', notes: 'Inbound web form lead.' },
+      { id: 4, company: 'Oakridge Dental', value: 6400, owner: 'Sarah K.', stage: 'won', tag: 'Booking Bot', priority: 'High', notes: 'Deposit paid, kickoff complete.' },
+      { id: 5, company: 'FinScale Partners', value: 12000, owner: 'Daniel R.', stage: 'proposal', tag: 'BI Dashboard', priority: 'High', notes: 'Needs multi-currency export.' },
+      { id: 6, company: 'UrbanFleet Delivery', value: 5300, owner: 'Daniel R.', stage: 'qualified', tag: 'Data Sync', priority: 'Medium', notes: 'Requested CSV sync every 15 min.' }
+    ];
+    let stageChartInst = null;
+    let ownerChartInst = null;
+    let activeDealId = null;
+
+    let rules = [
+      { id: 'r1', name: 'Lead Enrichment via Clearbit API', trigger: 'On New Lead', action: 'Fetch company size & assign owner', active: true },
+      { id: 'r2', name: 'Slack Deal Alert (> $5,000)', trigger: 'On Stage Change', action: 'Post notification to #sales-wins', active: true },
+      { id: 'r3', name: 'Auto-Generate PDF Proposal', trigger: 'On Proposal Sent', action: 'Compile itemized scope & email client', active: true },
+      { id: 'r4', name: 'Invoice Sync to QuickBooks', trigger: 'On Closed Won', action: 'Create draft invoice & receipt', active: false }
+    ];
+
+    let logs = [
+      '[22:01:14] Webhook OK: Oakridge Dental moved to Closed Won ($6,400)',
+      '[21:48:02] Rule #2 fired: Slack alert sent for FinScale Partners ($12,000)'
+    ];
+
+    let currentTab = 'board';
+
+    function renderMetrics() {
+      const total = deals.reduce((s, d) => s + d.value, 0);
+      const weighted = deals.reduce((s, d) => {
+        const st = STAGES.find((x) => x.id === d.stage);
+        return s + d.value * (st ? st.prob : 0);
+      }, 0);
+      const won = deals.filter((d) => d.stage === 'won').reduce((s, d) => s + d.value, 0);
+      const activeRules = rules.filter((r) => r.active).length;
+
+      document.getElementById('metricTotal').textContent = '$' + total.toLocaleString('en-US');
+      document.getElementById('metricWeighted').textContent = '$' + Math.round(weighted).toLocaleString('en-US');
+      document.getElementById('metricWon').textContent = '$' + won.toLocaleString('en-US');
+      document.getElementById('metricRules').textContent = `${activeRules} / ${rules.length}`;
+    }
+
+    function renderBoard() {
+      const q = document.getElementById('dealSearch').value.trim().toLowerCase();
+      const prio = document.getElementById('priorityFilter').value;
+      const grid = document.getElementById('kanbanGrid');
+      grid.innerHTML = '';
+
+      STAGES.forEach((st, stIdx) => {
+        const colDeals = deals.filter((d) => {
+          if (d.stage !== st.id) return false;
+          if (prio !== 'ALL' && d.priority !== prio) return false;
+          if (q && !d.company.toLowerCase().includes(q) && !d.owner.toLowerCase().includes(q)) return false;
+          return true;
+        });
+        const colSum = colDeals.reduce((s, d) => s + d.value, 0);
+
+        const col = document.createElement('div');
+        col.className = 'bg-slate-100/80 rounded-2xl p-3.5 border border-slate-200/80 space-y-3';
+        col.innerHTML = `
+          <div class="flex items-center justify-between px-1">
+            <div class="flex items-center gap-2">
+              <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold ${st.badge}">${st.title}</span>
+              <span class="text-xs font-semibold text-slate-500">${colDeals.length}</span>
+            </div>
+            <span class="text-xs font-bold text-slate-700">$${colSum.toLocaleString('en-US')}</span>
+          </div>
+          <div class="space-y-2.5">
+            ${colDeals.map((d) => `
+              <div class="bg-white rounded-xl border border-slate-200 p-3.5 shadow-xs space-y-2.5">
+                <div class="flex items-start justify-between gap-2">
+                  <button type="button" data-open="${d.id}" class="open-deal-btn text-left font-semibold text-sm text-slate-900 hover:text-blue-600 cursor-pointer">${d.company}</button>
+                  <span class="text-xs font-bold text-slate-900">$${d.value.toLocaleString('en-US')}</span>
+                </div>
+                <div class="flex items-center justify-between text-xs text-slate-500">
+                  <div class="flex items-center gap-1.5">
+                    <span class="bg-slate-100 px-2 py-0.5 rounded-md font-medium text-slate-700">${d.tag}</span>
+                    <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ${d.priority === 'High' ? 'bg-rose-50 text-rose-700' : d.priority === 'Medium' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600'}">${d.priority}</span>
+                  </div>
+                  <span>${d.owner}</span>
+                </div>
+                <div class="flex items-center justify-between pt-1 border-t border-slate-100">
+                  <button type="button" data-move="-1" data-id="${d.id}" class="move-btn text-xs font-medium px-2 py-1 rounded-md border border-slate-200 hover:bg-slate-50 ${stIdx === 0 ? 'opacity-30 pointer-events-none' : 'cursor-pointer'}">&larr; Prev</button>
+                  <button type="button" data-move="1" data-id="${d.id}" class="move-btn text-xs font-medium px-2 py-1 rounded-md border border-slate-200 hover:bg-slate-50 ${stIdx === STAGES.length - 1 ? 'opacity-30 pointer-events-none' : 'cursor-pointer'}">Next &rarr;</button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+        grid.appendChild(col);
+      });
+
+      document.querySelectorAll('.open-deal-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const deal = deals.find((d) => d.id === Number(btn.dataset.open));
+          if (!deal) return;
+          activeDealId = deal.id;
+          document.getElementById('detailTitle').textContent = `${deal.company} ($${deal.value.toLocaleString('en-US')})`;
+          document.getElementById('detailMeta').textContent = `Owner: ${deal.owner} · Priority: ${deal.priority} · Tag: ${deal.tag}`;
+          document.getElementById('detailNotes').value = deal.notes || '';
+          const m = document.getElementById('detailModal');
+          m.classList.remove('hidden');
+          m.classList.add('flex');
+        });
+      });
+
+      document.querySelectorAll('.move-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const id = Number(btn.dataset.id);
+          const delta = Number(btn.dataset.move);
+          const deal = deals.find((d) => d.id === id);
+          if (!deal) return;
+          const idx = STAGES.findIndex((s) => s.id === deal.stage);
+          const nextIdx = Math.max(0, Math.min(STAGES.length - 1, idx + delta));
+          deal.stage = STAGES[nextIdx].id;
+          logs.unshift(`[${new Date().toTimeString().slice(0, 8)}] ${deal.company} moved to ${STAGES[nextIdx].title}`);
+          renderAll();
+        });
+      });
+    }
+
+    function renderRules() {
+      const wrap = document.getElementById('rulesList');
+      wrap.innerHTML = rules.map((r) => `
+        <div class="flex flex-wrap items-center justify-between gap-3 p-4 rounded-xl border border-slate-200 bg-slate-50/50">
+          <div>
+            <div class="text-sm font-semibold text-slate-900">${r.name}</div>
+            <div class="text-xs text-slate-500 mt-0.5">${r.trigger} &rarr; ${r.action}</div>
+          </div>
+          <button type="button" data-rule="${r.id}" class="rule-toggle px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition ${r.active ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'}">
+            ${r.active ? 'Active' : 'Paused'}
+          </button>
+        </div>
+      `).join('');
+
+      document.querySelectorAll('.rule-toggle').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const rule = rules.find((x) => x.id === btn.dataset.rule);
+          if (!rule) return;
+          rule.active = !rule.active;
+          logs.unshift(`[${new Date().toTimeString().slice(0, 8)}] Rule "${rule.name}" set to ${rule.active ? 'Active' : 'Paused'}`);
+          renderAll();
+        });
+      });
+
+      document.getElementById('execLog').innerHTML = logs.slice(0, 12).map((l) => `<div class="py-1 border-b border-slate-100">${l}</div>`).join('');
+    }
+
+    function renderAnalytics() {
+      const stageSums = STAGES.map((st) => deals.filter((d) => d.stage === st.id).reduce((s, d) => s + d.value, 0));
+      if (stageChartInst) stageChartInst.destroy();
+      stageChartInst = new Chart(document.getElementById('stageChart'), {
+        type: 'bar',
+        data: {
+          labels: STAGES.map((s) => s.title),
+          datasets: [{ label: 'Pipeline ($)', data: stageSums, backgroundColor: ['#64748b', '#3b82f6', '#f59e0b', '#10b981'], borderRadius: 8 }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true, ticks: { callback: (v) => '$' + Number(v).toLocaleString('en-US') } } }
+        }
+      });
+
+      const ownerMap = {};
+      deals.forEach((d) => { ownerMap[d.owner] = (ownerMap[d.owner] || 0) + d.value; });
+      if (ownerChartInst) ownerChartInst.destroy();
+      ownerChartInst = new Chart(document.getElementById('ownerChart'), {
+        type: 'doughnut',
+        data: {
+          labels: Object.keys(ownerMap),
+          datasets: [{ data: Object.values(ownerMap), backgroundColor: ['#2563eb', '#10b981', '#f59e0b', '#8b5cf6'] }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+      });
+    }
+
+    function renderAll() {
+      renderMetrics();
+      renderBoard();
+      renderRules();
+      renderAnalytics();
+    }
+
+    document.querySelectorAll('.tab-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        currentTab = btn.dataset.tab;
+        document.querySelectorAll('.tab-btn').forEach((b) => {
+          const active = b.dataset.tab === currentTab;
+          b.classList.toggle('bg-white', active);
+          b.classList.toggle('text-slate-900', active);
+          b.classList.toggle('shadow-xs', active);
+          b.classList.toggle('text-slate-600', !active);
+        });
+        document.getElementById('boardView').classList.toggle('hidden', currentTab !== 'board');
+        document.getElementById('analyticsView').classList.toggle('hidden', currentTab !== 'analytics');
+        document.getElementById('rulesView').classList.toggle('hidden', currentTab !== 'rules');
+      });
+    });
+
+    document.getElementById('dealSearch').addEventListener('input', renderBoard);
+    document.getElementById('priorityFilter').addEventListener('change', renderBoard);
+    document.getElementById('closeDetailModal').addEventListener('click', () => {
+      const m = document.getElementById('detailModal');
+      m.classList.add('hidden');
+      m.classList.remove('flex');
+    });
+    document.getElementById('saveDetailBtn').addEventListener('click', () => {
+      const deal = deals.find((d) => d.id === activeDealId);
+      if (deal) deal.notes = document.getElementById('detailNotes').value.trim();
+      const m = document.getElementById('detailModal');
+      m.classList.add('hidden');
+      m.classList.remove('flex');
+      renderAll();
+    });
+    document.getElementById('deleteDealBtn').addEventListener('click', () => {
+      deals = deals.filter((d) => d.id !== activeDealId);
+      const m = document.getElementById('detailModal');
+      m.classList.add('hidden');
+      m.classList.remove('flex');
+      renderAll();
+    });
+
+    const dealModal = document.getElementById('dealModal');
+    document.getElementById('newDealBtn').addEventListener('click', () => {
+      dealModal.classList.remove('hidden');
+      dealModal.classList.add('flex');
+    });
+    document.getElementById('closeDealModal').addEventListener('click', () => {
+      dealModal.classList.add('hidden');
+      dealModal.classList.remove('flex');
+    });
+
+    document.getElementById('dealForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const company = document.getElementById('dealCompany').value.trim();
+      const value = Number(document.getElementById('dealValue').value) || 1000;
+      const owner = document.getElementById('dealOwner').value.trim();
+      const stage = document.getElementById('dealStage').value;
+      const priority = document.getElementById('dealPriority').value;
+      deals.unshift({ id: Date.now(), company, value, owner, stage, tag: 'Custom', priority, notes: '' });
+      logs.unshift(`[${new Date().toTimeString().slice(0, 8)}] New deal created: ${company} ($${value.toLocaleString('en-US')})`);
+      dealModal.classList.add('hidden');
+      dealModal.classList.remove('flex');
+      document.getElementById('dealForm').reset();
+      renderAll();
+    });
+
+    document.getElementById('simulateTriggerBtn').addEventListener('click', () => {
+      const sampleNames = ['NovaTech Systems', 'ClearWater Labs', 'Summit Freight', 'Aurora Health'];
+      const name = sampleNames[Math.floor(Math.random() * sampleNames.length)];
+      const val = (Math.floor(Math.random() * 8) + 3) * 1000;
+      deals.unshift({ id: Date.now(), company: name, value: val, owner: 'AI Router', stage: 'lead', tag: 'Webhook', priority: 'High', notes: 'Auto-routed via webhook simulator.' });
+      logs.unshift(`[${new Date().toTimeString().slice(0, 8)}] Incoming webhook: ${name} ($${val.toLocaleString('en-US')}) routed to New Lead`);
+      renderAll();
+    });
+
+    renderAll();
+  </script>
+</body>
+</html>
